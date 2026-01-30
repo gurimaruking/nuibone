@@ -1,0 +1,30 @@
+# PlatformIO
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# IDE
+.vscode/
+.idea/
+*.sublime-*
+
+# Flutter
+app/nuibone_app/.dart_tool/
+app/nuibone_app/.packages
+app/nuibone_app/build/
+app/nuibone_app/pubspec.lock
+
+# Generated files
+*.stl
+*.gcode
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Temporary files
+*.tmp
+*.bak
+.claude/
