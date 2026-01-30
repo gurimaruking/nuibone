@@ -1,6 +1,8 @@
 # ぬいボーン（NuiBone）プロジェクト
 
-15cmの人型ぬいぐるみに内蔵するロボット骨格システム
+10cm / 15cm の人型ぬいぐるみに内蔵するロボット骨格システム
+
+> 🧸 ぬいぐるみに命を吹き込もう！
 
 ## 概要
 
@@ -74,11 +76,19 @@
 
 ### サイズ制約
 
+**15cm版（標準）**
 - ぬいぐるみサイズ: 高さ15cm
 - 骨格最大幅: 約4cm（胴体部）
 - 骨格最大厚: 約2.5cm
-- 腕の長さ: 約3-4cm
-- 足の長さ: 約3-4cm
+- 腕の長さ: 約3.5cm
+- サーボ: SG90 (9g)
+
+**10cm版（コンパクト）**
+- ぬいぐるみサイズ: 高さ10cm
+- 骨格最大幅: 約2.4cm（胴体部）
+- 骨格最大厚: 約1.4cm
+- 腕の長さ: 約2.2cm
+- サーボ: SG51R (5g) または 振動モーター
 
 ## ソフトウェア構成
 
@@ -107,20 +117,37 @@
 
 ```
 nuibone/
-├── README.md                 # このファイル
+├── README.md                    # このファイル
+├── ASSEMBLY.md                  # 組み立てガイド
 ├── hardware/
-│   ├── 3d_models/           # OpenSCAD/STLファイル
-│   │   ├── body_frame.scad  # 胴体フレーム
-│   │   ├── arm_bone.scad    # 腕ボーン
-│   │   ├── shoulder.scad    # 肩（サーボマウント）
-│   │   ├── breathing.scad   # 呼吸機構
-│   │   └── foot.scad        # 足（磁石・重りホルダー）
-│   └── wiring/              # 配線図
+│   ├── 3d_models/              # OpenSCAD/STLファイル
+│   │   ├── config.scad         # 15cm版 共通設定
+│   │   ├── config_10cm.scad    # 10cm版 共通設定
+│   │   ├── body_frame.scad     # 15cm版 胴体フレーム
+│   │   ├── body_frame_10cm.scad # 10cm版 胴体フレーム
+│   │   ├── arm_bone.scad       # 15cm版 腕ボーン
+│   │   ├── arm_bone_10cm.scad  # 10cm版 腕ボーン
+│   │   ├── breathing.scad      # 呼吸機構
+│   │   ├── foot.scad           # 15cm版 足
+│   │   ├── foot_10cm.scad      # 10cm版 足
+│   │   ├── full_assembly.scad  # 15cm版 フルアセンブリ
+│   │   ├── full_assembly_10cm.scad # 10cm版 フルアセンブリ
+│   │   ├── print_plate.scad    # 15cm版 印刷用
+│   │   └── print_plate_10cm.scad # 10cm版 印刷用
+│   └── wiring/                 # 配線図
 ├── firmware/
-│   └── nuibone_esp32/       # ESP32 Arduinoプロジェクト
+│   └── nuibone_esp32/          # ESP32 Arduinoプロジェクト
 └── app/
-    └── nuibone_app/         # Flutter/React Nativeアプリ
+    └── nuibone_app/            # Flutterアプリ
 ```
+
+## バージョン選択ガイド
+
+| サイズ | 推奨サーボ | 推奨電源 | 推奨マイコン |
+|--------|-----------|----------|-------------|
+| 15cm | SG90 (9g) | 単3×3本 | ESP32-C3 |
+| 10cm | SG51R (5g) | LiPo 1S 150mAh | XIAO ESP32C3 |
+| 10cm (簡易) | 振動モーター | LiPo 1S 100mAh | XIAO ESP32C3 |
 
 ## ライセンス
 
