@@ -173,6 +173,7 @@ class BleService extends ChangeNotifier {
 
 /// コマンド定義（ESP32と一致させる）
 class NuiBoneCommand {
+  // 動作コマンド
   static const int stop = 0;
   static const int waveRight = 1;
   static const int waveLeft = 2;
@@ -182,4 +183,15 @@ class NuiBoneCommand {
   static const int energetic = 6;
   static const int sleep = 7;
   static const int greeting = 8;
+
+  // 音声コマンド (10番台)
+  static const int voiceHello = 10;   // 「こんにちは」
+  static const int voiceThanks = 11;  // 「ありがとう」
+  static const int voiceLove = 12;    // 「だいすき」
+  static const int voiceSleepy = 13;  // 「ねむい」
+  static const int voiceHappy = 14;   // 「うれしい」
+  static const int voiceCustom1 = 15; // カスタム音声1
+  static const int voiceCustom2 = 16; // カスタム音声2
+  static const int voiceCustom3 = 17; // カスタム音声3
+  static const int voiceStop = 19;    // 音声停止
 }

@@ -351,6 +351,109 @@ class _ControlPanel extends StatelessWidget {
               ),
             ],
           ),
+
+          const SizedBox(height: 16),
+
+          // 音声セクション
+          _SectionCard(
+            title: 'ボイス',
+            icon: Icons.record_voice_over,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: _ActionButton(
+                      label: 'こんにちは',
+                      icon: Icons.waving_hand,
+                      command: NuiBoneCommand.voiceHello,
+                      color: Colors.blue,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _ActionButton(
+                      label: 'ありがとう',
+                      icon: Icons.volunteer_activism,
+                      command: NuiBoneCommand.voiceThanks,
+                      color: Colors.pink,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _ActionButton(
+                      label: 'だいすき',
+                      icon: Icons.favorite,
+                      command: NuiBoneCommand.voiceLove,
+                      color: Colors.red,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: _ActionButton(
+                      label: 'ねむい',
+                      icon: Icons.bedtime,
+                      command: NuiBoneCommand.voiceSleepy,
+                      color: Colors.indigo,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _ActionButton(
+                      label: 'うれしい',
+                      icon: Icons.sentiment_very_satisfied,
+                      command: NuiBoneCommand.voiceHappy,
+                      color: Colors.amber,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _ActionButton(
+                      label: '停止',
+                      icon: Icons.volume_off,
+                      command: NuiBoneCommand.voiceStop,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              // カスタム音声
+              Row(
+                children: [
+                  Expanded(
+                    child: _ActionButton(
+                      label: 'カスタム1',
+                      icon: Icons.music_note,
+                      command: NuiBoneCommand.voiceCustom1,
+                      color: Colors.teal,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _ActionButton(
+                      label: 'カスタム2',
+                      icon: Icons.music_note,
+                      command: NuiBoneCommand.voiceCustom2,
+                      color: Colors.teal,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _ActionButton(
+                      label: 'カスタム3',
+                      icon: Icons.music_note,
+                      command: NuiBoneCommand.voiceCustom3,
+                      color: Colors.teal,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ],
       ),
     );
