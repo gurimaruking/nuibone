@@ -1,11 +1,12 @@
 /**
- * NuiBone - ESP32 Firmware
+ * NuiBone - ESP32 Firmware (Basic Version)
  *
  * 15cmぬいぐるみ用ロボット骨格制御
  * - BLE経由でスマホアプリから制御
  * - 3つのSG90サーボ（左腕、右腕、呼吸）
  * - プリセット動作パターン
- * - 音声再生（WAVファイル）
+ *
+ * ※音声機能は別途追加予定
  */
 
 #include <Arduino.h>
@@ -14,27 +15,14 @@
 #include <BLEUtils.h>
 #include <BLE2902.h>
 #include <ESP32Servo.h>
-#include "AudioFileSourceSD.h"
-#include "AudioGeneratorWAV.h"
-#include "AudioOutputI2S.h"
-#include <SD.h>
-#include <SPI.h>
 
 // ============================================
-// ピン設定
+// ピン設定 (ESP32-C3対応)
 // ============================================
-// サーボ
-#define SERVO_LEFT_ARM_PIN   13  // 左腕サーボ
-#define SERVO_RIGHT_ARM_PIN  12  // 右腕サーボ
-#define SERVO_BREATH_PIN     14  // 呼吸サーボ
-
-// I2S オーディオ出力（MAX98357A等）
-#define I2S_BCLK_PIN         26  // ビットクロック
-#define I2S_LRC_PIN          25  // LRクロック（ワードセレクト）
-#define I2S_DOUT_PIN         22  // データ出力
-
-// SDカード（SPI）
-#define SD_CS_PIN            5   // SDカード CS
+// ESP32-C3ではGPIO 1-10, 18-21 がサーボ用に使用可能
+#define SERVO_LEFT_ARM_PIN   2   // 左腕サーボ (GPIO2)
+#define SERVO_RIGHT_ARM_PIN  3   // 右腕サーボ (GPIO3)
+#define SERVO_BREATH_PIN     4   // 呼吸サーボ (GPIO4)
 
 // ============================================
 // BLE設定
@@ -71,34 +59,7 @@ enum Command {
     CMD_ENERGETIC = 6,      // 元気モード
     CMD_SLEEP = 7,          // おやすみ
     CMD_GREETING = 8,       // 挨拶
-
-    // 音声コマンド (10番台)
-    CMD_VOICE_HELLO = 10,   // 「こんにちは」
-    CMD_VOICE_THANKS = 11,  // 「ありがとう」
-    CMD_VOICE_LOVE = 12,    // 「だいすき」
-    CMD_VOICE_SLEEPY = 13,  // 「ねむい」
-    CMD_VOICE_HAPPY = 14,   // 「うれしい」
-    CMD_VOICE_CUSTOM1 = 15, // カスタム音声1
-    CMD_VOICE_CUSTOM2 = 16, // カスタム音声2
-    CMD_VOICE_CUSTOM3 = 17, // カスタム音声3
-    CMD_VOICE_STOP = 19,    // 音声停止
 };
-
-// ============================================
-// 音声ファイル定義
-// ============================================
-// SDカードのルートに配置するWAVファイル名
-const char* voiceFiles[] = {
-    "/hello.wav",    // CMD_VOICE_HELLO (10)
-    "/thanks.wav",   // CMD_VOICE_THANKS (11)
-    "/love.wav",     // CMD_VOICE_LOVE (12)
-    "/sleepy.wav",   // CMD_VOICE_SLEEPY (13)
-    "/happy.wav",    // CMD_VOICE_HAPPY (14)
-    "/custom1.wav",  // CMD_VOICE_CUSTOM1 (15)
-    "/custom2.wav",  // CMD_VOICE_CUSTOM2 (16)
-    "/custom3.wav",  // CMD_VOICE_CUSTOM3 (17)
-};
-#define VOICE_FILE_COUNT 8
 
 // ============================================
 // グローバル変数
@@ -126,110 +87,87 @@ int breathPhase = 0;
 int wavePhase = 0;
 int waveCount = 0;
 
-// オーディオ
-AudioGeneratorWAV *wav = nullptr;
-AudioFileSourceSD *file = nullptr;
-AudioOutputI2S *out = nullptr;
-bool isPlaying = false;
-bool sdCardAvailable = false;
+// ============================================
+// 前方宣言
+// ============================================
+void updateStatus();
+void stopAll();
+void startWave(bool right, bool left);
+void executeCommand(int cmd);
 
 // ============================================
-// 音声再生関数
+// ステータス更新
 // ============================================
-void playVoice(int voiceIndex) {
-    if (!sdCardAvailable) {
-        Serial.println("SD card not available");
-        return;
-    }
-
-    if (voiceIndex < 0 || voiceIndex >= VOICE_FILE_COUNT) {
-        Serial.printf("Invalid voice index: %d\n", voiceIndex);
-        return;
-    }
-
-    // 再生中なら停止
-    stopVoice();
-
-    const char* filename = voiceFiles[voiceIndex];
-    Serial.printf("Playing: %s\n", filename);
-
-    if (!SD.exists(filename)) {
-        Serial.printf("File not found: %s\n", filename);
-        return;
-    }
-
-    file = new AudioFileSourceSD(filename);
-    wav = new AudioGeneratorWAV();
-
-    if (wav->begin(file, out)) {
-        isPlaying = true;
-        Serial.println("Playback started");
-    } else {
-        Serial.println("Failed to start playback");
-        delete wav;
-        delete file;
-        wav = nullptr;
-        file = nullptr;
-    }
-}
-
-void stopVoice() {
-    if (wav != nullptr) {
-        if (wav->isRunning()) {
-            wav->stop();
-        }
-        delete wav;
-        wav = nullptr;
-    }
-    if (file != nullptr) {
-        delete file;
-        file = nullptr;
-    }
-    isPlaying = false;
-}
-
-void updateAudio() {
-    if (isPlaying && wav != nullptr) {
-        if (wav->isRunning()) {
-            if (!wav->loop()) {
-                // 再生完了
-                stopVoice();
-                Serial.println("Playback finished");
-            }
-        }
+void updateStatus() {
+    if (pStatusChar != nullptr) {
+        char statusBuf[32];
+        snprintf(statusBuf, sizeof(statusBuf), "%d,%d,%d",
+                 currentCommand,
+                 isBreathing ? 1 : 0,
+                 isWaving ? 1 : 0);
+        pStatusChar->setValue((uint8_t*)statusBuf, strlen(statusBuf));
+        pStatusChar->notify();
     }
 }
 
 // ============================================
-// オーディオ初期化
+// 動作制御関数
 // ============================================
-void setupAudio() {
-    // SDカード初期化
-    SPI.begin();
-    if (!SD.begin(SD_CS_PIN)) {
-        Serial.println("SD card initialization failed!");
-        sdCardAvailable = false;
-    } else {
-        Serial.println("SD card initialized");
-        sdCardAvailable = true;
+void stopAll() {
+    isBreathing = false;
+    isWaving = false;
+    servoLeftArm.write(ARM_CENTER);
+    servoRightArm.write(ARM_CENTER);
+    servoBreath.write(ARM_CENTER);
+}
 
-        // ファイル一覧表示
-        Serial.println("Voice files on SD:");
-        for (int i = 0; i < VOICE_FILE_COUNT; i++) {
-            if (SD.exists(voiceFiles[i])) {
-                Serial.printf("  [OK] %s\n", voiceFiles[i]);
-            } else {
-                Serial.printf("  [--] %s (not found)\n", voiceFiles[i]);
-            }
-        }
+void startWave(bool right, bool left) {
+    isWaving = true;
+    wavePhase = 0;
+    waveCount = 0;
+}
+
+// ============================================
+// コマンド実行
+// ============================================
+void executeCommand(int cmd) {
+    currentCommand = cmd;
+
+    switch (cmd) {
+        case CMD_STOP:
+            stopAll();
+            break;
+        case CMD_WAVE_RIGHT:
+            startWave(true, false);
+            break;
+        case CMD_WAVE_LEFT:
+            startWave(false, true);
+            break;
+        case CMD_WAVE_BOTH:
+            startWave(true, true);
+            break;
+        case CMD_BREATH_ON:
+            isBreathing = true;
+            break;
+        case CMD_BREATH_OFF:
+            isBreathing = false;
+            servoBreath.write(ARM_CENTER);
+            break;
+        case CMD_ENERGETIC:
+            isBreathing = true;
+            startWave(true, true);
+            break;
+        case CMD_SLEEP:
+            stopAll();
+            break;
+        case CMD_GREETING:
+            startWave(true, false);
+            break;
+        default:
+            break;
     }
 
-    // I2S出力初期化
-    out = new AudioOutputI2S();
-    out->SetPinout(I2S_BCLK_PIN, I2S_LRC_PIN, I2S_DOUT_PIN);
-    out->SetGain(0.5);  // 音量 (0.0 - 1.0)
-
-    Serial.println("Audio initialized");
+    updateStatus();
 }
 
 // ============================================
@@ -249,97 +187,11 @@ class ServerCallbacks : public BLEServerCallbacks {
 
 class CommandCallbacks : public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic* pCharacteristic) {
-        String value = pCharacteristic->getValue();
+        std::string value = pCharacteristic->getValue();
         if (value.length() > 0) {
             int cmd = value[0];
             Serial.printf("Received command: %d\n", cmd);
             executeCommand(cmd);
-        }
-    }
-
-    void executeCommand(int cmd) {
-        currentCommand = cmd;
-
-        // 動作コマンド
-        switch (cmd) {
-            case CMD_STOP:
-                stopAll();
-                break;
-            case CMD_WAVE_RIGHT:
-                startWave(true, false);
-                break;
-            case CMD_WAVE_LEFT:
-                startWave(false, true);
-                break;
-            case CMD_WAVE_BOTH:
-                startWave(true, true);
-                break;
-            case CMD_BREATH_ON:
-                isBreathing = true;
-                break;
-            case CMD_BREATH_OFF:
-                isBreathing = false;
-                servoBreath.write(ARM_CENTER);
-                break;
-            case CMD_ENERGETIC:
-                isBreathing = true;
-                startWave(true, true);
-                playVoice(4);  // happy.wav
-                break;
-            case CMD_SLEEP:
-                stopAll();
-                playVoice(3);  // sleepy.wav
-                break;
-            case CMD_GREETING:
-                startWave(true, false);
-                playVoice(0);  // hello.wav
-                break;
-
-            // 音声コマンド
-            case CMD_VOICE_HELLO:
-            case CMD_VOICE_THANKS:
-            case CMD_VOICE_LOVE:
-            case CMD_VOICE_SLEEPY:
-            case CMD_VOICE_HAPPY:
-            case CMD_VOICE_CUSTOM1:
-            case CMD_VOICE_CUSTOM2:
-            case CMD_VOICE_CUSTOM3:
-                playVoice(cmd - CMD_VOICE_HELLO);
-                break;
-            case CMD_VOICE_STOP:
-                stopVoice();
-                break;
-
-            default:
-                break;
-        }
-
-        updateStatus();
-    }
-
-    void stopAll() {
-        isBreathing = false;
-        isWaving = false;
-        servoLeftArm.write(ARM_CENTER);
-        servoRightArm.write(ARM_CENTER);
-        servoBreath.write(ARM_CENTER);
-        stopVoice();
-    }
-
-    void startWave(bool right, bool left) {
-        isWaving = true;
-        wavePhase = 0;
-        waveCount = 0;
-    }
-
-    void updateStatus() {
-        if (pStatusChar != nullptr) {
-            String status = String(currentCommand) + "," +
-                           String(isBreathing ? 1 : 0) + "," +
-                           String(isWaving ? 1 : 0) + "," +
-                           String(isPlaying ? 1 : 0);
-            pStatusChar->setValue(status);
-            pStatusChar->notify();
         }
     }
 };
@@ -394,14 +246,30 @@ void setupBLE() {
 
     pService->start();
 
+    // iOS対応のアドバタイズ設定
     BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
     pAdvertising->addServiceUUID(SERVICE_UUID);
     pAdvertising->setScanResponse(true);
-    pAdvertising->setMinPreferred(0x06);
-    pAdvertising->setMinPreferred(0x12);
+
+    // iOS接続性向上のための設定
+    pAdvertising->setMinPreferred(0x06);  // iPhone接続に必要
+    pAdvertising->setMaxPreferred(0x12);  // 接続間隔の最大値
+
+    // アドバタイズデータを設定
+    BLEAdvertisementData advData;
+    advData.setName("NuiBone");
+    advData.setCompleteServices(BLEUUID(SERVICE_UUID));
+    pAdvertising->setAdvertisementData(advData);
+
+    // スキャンレスポンスデータ
+    BLEAdvertisementData scanData;
+    scanData.setName("NuiBone");
+    pAdvertising->setScanResponseData(scanData);
+
     BLEDevice::startAdvertising();
 
     Serial.println("BLE initialized, waiting for connection...");
+    Serial.println("Device name: NuiBone");
 }
 
 // ============================================
@@ -487,7 +355,6 @@ void setup() {
     Serial.println("\n=== NuiBone Starting ===");
 
     setupServos();
-    setupAudio();
     setupBLE();
 
     Serial.println("=== Ready ===");
@@ -500,7 +367,6 @@ void loop() {
     handleBLEReconnection();
     updateBreathing();
     updateWaving();
-    updateAudio();
 
     delay(10);
 }

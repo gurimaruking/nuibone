@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NuiBone Controller</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 28px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .status-card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #e74c3c;
+        }
+
+        .status-dot.connected {
+            background: #2ecc71;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .status-text {
+            font-size: 16px;
+            color: #333;
+        }
+
+        #connectBtn {
+            width: 100%;
+            padding: 15px;
+            margin-top: 15px;
+            font-size: 18px;
+            font-weight: bold;
+            color: white;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        #connectBtn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        #connectBtn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .control-section {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .section-title {
+            font-size: 14px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 15px;
+        }
+
+        .button-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .button-grid.single {
+            grid-template-columns: 1fr;
+        }
+
+        .control-btn {
+            padding: 20px 15px;
+            font-size: 16px;
+            font-weight: 600;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.1s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .control-btn:active {
+            transform: scale(0.95);
+        }
+
+        .control-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .control-btn .icon {
+            font-size: 28px;
+        }
+
+        /* 色分け */
+        .btn-wave-right { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+        .btn-wave-left { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+        .btn-wave-both { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+        .btn-breath { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+        .btn-energetic { background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%); color: #333; }
+        .btn-greeting { background: linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%); }
+        .btn-sleep { background: linear-gradient(135deg, #2c3e50 0%, #4ca1af 100%); }
+        .btn-stop { background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%); }
+
+        .footer {
+            text-align: center;
+            color: rgba(255,255,255,0.7);
+            font-size: 12px;
+            margin-top: 20px;
+        }
+
+        /* iOS Safari対応 */
+        .ios-warning {
+            background: #fff3cd;
+            color: #856404;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .ios-warning.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 NuiBone</h1>
+
+        <div class="ios-warning" id="iosWarning">
+            ⚠️ iOSのSafariではWeb Bluetoothは使えません。<br>
+            <strong>Bluefy</strong>アプリ（無料）を使ってこのページを開いてください。
+        </div>
+
+        <div class="status-card">
+            <div class="status">
+                <div class="status-dot" id="statusDot"></div>
+                <span class="status-text" id="statusText">未接続</span>
+            </div>
+            <button id="connectBtn" onclick="toggleConnection()">接続する</button>
+        </div>
+
+        <div class="control-section">
+            <div class="section-title">🖐️ 手を振る</div>
+            <div class="button-grid">
+                <button class="control-btn btn-wave-right" onclick="sendCommand(1)" disabled>
+                    <span class="icon">👋</span>
+                    右手
+                </button>
+                <button class="control-btn btn-wave-left" onclick="sendCommand(2)" disabled>
+                    <span class="icon">🤚</span>
+                    左手
+                </button>
+                <button class="control-btn btn-wave-both" onclick="sendCommand(3)" disabled>
+                    <span class="icon">🙌</span>
+                    両手
+                </button>
+                <button class="control-btn btn-greeting" onclick="sendCommand(8)" disabled>
+                    <span class="icon">👐</span>
+                    挨拶
+                </button>
+            </div>
+        </div>
+
+        <div class="control-section">
+            <div class="section-title">💨 呼吸</div>
+            <div class="button-grid">
+                <button class="control-btn btn-breath" onclick="sendCommand(4)" disabled>
+                    <span class="icon">😮‍💨</span>
+                    呼吸ON
+                </button>
+                <button class="control-btn btn-stop" onclick="sendCommand(5)" disabled>
+                    <span class="icon">😶</span>
+                    呼吸OFF
+                </button>
+            </div>
+        </div>
+
+        <div class="control-section">
+            <div class="section-title">✨ プリセット</div>
+            <div class="button-grid">
+                <button class="control-btn btn-energetic" onclick="sendCommand(6)" disabled>
+                    <span class="icon">🎉</span>
+                    元気モード
+                </button>
+                <button class="control-btn btn-sleep" onclick="sendCommand(7)" disabled>
+                    <span class="icon">😴</span>
+                    おやすみ
+                </button>
+            </div>
+        </div>
+
+        <div class="control-section">
+            <div class="section-title">⏹️ 停止</div>
+            <div class="button-grid single">
+                <button class="control-btn btn-stop" onclick="sendCommand(0)" disabled>
+                    <span class="icon">🛑</span>
+                    全停止
+                </button>
+            </div>
+        </div>
+
+        <div class="footer">
+            NuiBone Controller v1.0<br>
+            Web Bluetooth API
+        </div>
+    </div>
+
+    <script>
+        // BLE設定
+        const SERVICE_UUID = '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
+        const COMMAND_CHAR_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26a8';
+
+        let device = null;
+        let server = null;
+        let commandChar = null;
+        let isConnected = false;
+
+        // iOS検出
+        function isIOS() {
+            return /iPad|iPhone|iPod/.test(navigator.userAgent);
+        }
+
+        // Web Bluetooth対応チェック
+        function checkBluetooth() {
+            if (!navigator.bluetooth) {
+                if (isIOS()) {
+                    document.getElementById('iosWarning').classList.add('show');
+                } else {
+                    alert('このブラウザはWeb Bluetoothに対応していません。\nChrome, Edge, またはOperaを使用してください。');
+                }
+                return false;
+            }
+            return true;
+        }
+
+        // 接続/切断トグル
+        async function toggleConnection() {
+            if (isConnected) {
+                disconnect();
+            } else {
+                await connect();
+            }
+        }
+
+        // BLE接続
+        async function connect() {
+            if (!checkBluetooth()) return;
+
+            try {
+                updateStatus('検索中...', false);
+                document.getElementById('connectBtn').disabled = true;
+
+                // デバイス選択
+                device = await navigator.bluetooth.requestDevice({
+                    filters: [{ name: 'NuiBone' }],
+                    optionalServices: [SERVICE_UUID]
+                });
+
+                updateStatus('接続中...', false);
+
+                // 切断イベント
+                device.addEventListener('gattserverdisconnected', onDisconnected);
+
+                // GATT接続
+                server = await device.gatt.connect();
+
+                // サービス取得
+                const service = await server.getPrimaryService(SERVICE_UUID);
+
+                // キャラクタリスティック取得
+                commandChar = await service.getCharacteristic(COMMAND_CHAR_UUID);
+
+                isConnected = true;
+                updateStatus('接続済み: ' + device.name, true);
+                document.getElementById('connectBtn').textContent = '切断する';
+                enableButtons(true);
+
+            } catch (error) {
+                console.error('接続エラー:', error);
+                if (error.name !== 'NotFoundError') {
+                    updateStatus('接続失敗: ' + error.message, false);
+                } else {
+                    updateStatus('未接続', false);
+                }
+            } finally {
+                document.getElementById('connectBtn').disabled = false;
+            }
+        }
+
+        // 切断
+        function disconnect() {
+            if (device && device.gatt.connected) {
+                device.gatt.disconnect();
+            }
+            onDisconnected();
+        }
+
+        // 切断時の処理
+        function onDisconnected() {
+            isConnected = false;
+            commandChar = null;
+            updateStatus('未接続', false);
+            document.getElementById('connectBtn').textContent = '接続する';
+            enableButtons(false);
+        }
+
+        // コマンド送信
+        async function sendCommand(cmd) {
+            if (!commandChar) {
+                alert('接続されていません');
+                return;
+            }
+
+            try {
+                const data = new Uint8Array([cmd]);
+                await commandChar.writeValue(data);
+                console.log('コマンド送信:', cmd);
+
+                // ボタンフィードバック
+                vibrate();
+
+            } catch (error) {
+                console.error('送信エラー:', error);
+                alert('コマンド送信に失敗しました');
+            }
+        }
+
+        // バイブレーション（対応デバイスのみ）
+        function vibrate() {
+            if (navigator.vibrate) {
+                navigator.vibrate(50);
+            }
+        }
+
+        // ステータス更新
+        function updateStatus(text, connected) {
+            document.getElementById('statusText').textContent = text;
+            const dot = document.getElementById('statusDot');
+            if (connected) {
+                dot.classList.add('connected');
+            } else {
+                dot.classList.remove('connected');
+            }
+        }
+
+        // ボタン有効/無効
+        function enableButtons(enabled) {
+            const buttons = document.querySelectorAll('.control-btn');
+            buttons.forEach(btn => {
+                btn.disabled = !enabled;
+            });
+        }
+
+        // 初期化
+        window.onload = function() {
+            checkBluetooth();
+        };
+    </script>
+</body>
+</html>
