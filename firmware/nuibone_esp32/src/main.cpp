@@ -42,9 +42,10 @@
 #define ARM_FORWARD     120   // 前方位置 (度)
 #define ARM_BACKWARD    60    // 後方位置 (度)
 
-// 呼吸の動作範囲
-#define BREATH_MIN      85    // 吸気位置 (度)
-#define BREATH_MAX      95    // 呼気位置 (度)
+// 呼吸の動作範囲（デフォルト値、Webから調整可能）
+#define BREATH_CENTER   90    // 呼吸中央位置 (度)
+#define BREATH_DEFAULT_RANGE 10  // デフォルト振幅 (±度)
+#define BREATH_DEFAULT_SPEED 2500 // デフォルト速度 (ms)
 
 // ============================================
 // コマンド定義
@@ -59,6 +60,12 @@ enum Command {
     CMD_ENERGETIC = 6,      // 元気モード
     CMD_SLEEP = 7,          // おやすみ
     CMD_GREETING = 8,       // 挨拶
+    // 設定コマンド (20-29)
+    CMD_SET_BREATH_SPEED = 20,  // 呼吸速度設定
+    CMD_SET_BREATH_RANGE = 21,  // 呼吸振幅設定
+    CMD_SET_WAVE_SPEED = 22,    // 腕振り速度設定
+    CMD_SET_WAVE_RANGE = 23,    // 腕振り振幅設定
+    CMD_SET_WAVE_COUNT = 24,    // 腕振り回数設定
 };
 
 // ============================================
@@ -86,6 +93,15 @@ unsigned long lastWaveTime = 0;
 int breathPhase = 0;
 int wavePhase = 0;
 int waveCount = 0;
+
+// 呼吸設定（Webから調整可能）
+int breathSpeed = BREATH_DEFAULT_SPEED;  // 呼吸周期 (ms) 大きいほどゆっくり
+int breathRange = BREATH_DEFAULT_RANGE;  // 呼吸振幅 (度) 大きいほど大きく動く
+
+// 腕振り設定（Webから調整可能）
+int waveSpeed = 300;     // 腕振り速度 (ms)
+int waveRange = 30;      // 腕振り振幅 (度)
+int waveMaxCount = 3;    // 腕振り回数
 
 // ============================================
 // 前方宣言
@@ -191,7 +207,46 @@ class CommandCallbacks : public BLECharacteristicCallbacks {
         if (value.length() > 0) {
             int cmd = value[0];
             Serial.printf("Received command: %d\n", cmd);
-            executeCommand(cmd);
+
+            // 設定コマンドの処理
+            if (cmd == CMD_SET_BREATH_SPEED && value.length() >= 3) {
+                // 速度設定: [20, high, low] -> speed = high*256 + low
+                breathSpeed = (value[1] << 8) | value[2];
+                if (breathSpeed < 500) breathSpeed = 500;    // 最小0.5秒
+                if (breathSpeed > 10000) breathSpeed = 10000; // 最大10秒
+                Serial.printf("Breath speed set to: %d ms\n", breathSpeed);
+            }
+            else if (cmd == CMD_SET_BREATH_RANGE && value.length() >= 2) {
+                // 振幅設定: [21, range]
+                breathRange = value[1];
+                if (breathRange < 5) breathRange = 5;    // 最小5度
+                if (breathRange > 45) breathRange = 45;  // 最大45度
+                Serial.printf("Breath range set to: %d degrees\n", breathRange);
+            }
+            else if (cmd == CMD_SET_WAVE_SPEED && value.length() >= 3) {
+                // 腕振り速度設定: [22, high, low]
+                waveSpeed = (value[1] << 8) | value[2];
+                if (waveSpeed < 100) waveSpeed = 100;
+                if (waveSpeed > 1000) waveSpeed = 1000;
+                Serial.printf("Wave speed set to: %d ms\n", waveSpeed);
+            }
+            else if (cmd == CMD_SET_WAVE_RANGE && value.length() >= 2) {
+                // 腕振り振幅設定: [23, range]
+                waveRange = value[1];
+                if (waveRange < 10) waveRange = 10;
+                if (waveRange > 60) waveRange = 60;
+                Serial.printf("Wave range set to: %d degrees\n", waveRange);
+            }
+            else if (cmd == CMD_SET_WAVE_COUNT && value.length() >= 2) {
+                // 腕振り回数設定: [24, count]
+                waveMaxCount = value[1];
+                if (waveMaxCount < 1) waveMaxCount = 1;
+                if (waveMaxCount > 20) waveMaxCount = 20;
+                Serial.printf("Wave count set to: %d times\n", waveMaxCount);
+            }
+            else {
+                executeCommand(cmd);
+            }
         }
     }
 };
@@ -273,34 +328,36 @@ void setupBLE() {
 }
 
 // ============================================
-// 呼吸アニメーション更新
+// 呼吸アニメーション更新（スムーズ版）
 // ============================================
 void updateBreathing() {
     if (!isBreathing) return;
 
     unsigned long now = millis();
-    int breathInterval = (currentCommand == CMD_ENERGETIC) ? 750 : 1500;
+    int actualSpeed = (currentCommand == CMD_ENERGETIC) ? breathSpeed / 3 : breathSpeed;
 
-    if (now - lastBreathTime > breathInterval) {
+    // スムーズな呼吸のため、細かく更新（20ms間隔）
+    if (now - lastBreathTime > 20) {
         lastBreathTime = now;
-        breathPhase = (breathPhase + 1) % 2;
 
-        if (breathPhase == 0) {
-            servoBreath.write(BREATH_MIN);
-        } else {
-            servoBreath.write(BREATH_MAX);
-        }
+        // サイン波で滑らかに動かす
+        float phase = (float)(now % actualSpeed) / actualSpeed;  // 0.0 ~ 1.0
+        float sineValue = sin(phase * 2 * PI);  // -1.0 ~ 1.0
+
+        int angle = BREATH_CENTER + (int)(sineValue * breathRange);
+        servoBreath.write(angle);
     }
 }
 
 // ============================================
-// 手振りアニメーション更新
+// 手振りアニメーション更新（設定値対応版）
 // ============================================
 void updateWaving() {
     if (!isWaving) return;
 
     unsigned long now = millis();
-    int waveInterval = (currentCommand == CMD_ENERGETIC) ? 200 : 300;
+    // 設定値を使用（元気モードは半分の速度）
+    int waveInterval = (currentCommand == CMD_ENERGETIC) ? waveSpeed / 2 : waveSpeed;
 
     if (now - lastWaveTime > waveInterval) {
         lastWaveTime = now;
@@ -314,16 +371,21 @@ void updateWaving() {
                         currentCommand == CMD_WAVE_BOTH ||
                         currentCommand == CMD_ENERGETIC);
 
+        // 設定値を使って振り幅を計算
+        int armForward = ARM_CENTER + waveRange;
+        int armBackward = ARM_CENTER - waveRange;
+
         if (wavePhase == 0) {
-            if (waveRight) servoRightArm.write(ARM_FORWARD);
-            if (waveLeft) servoLeftArm.write(ARM_BACKWARD);
+            if (waveRight) servoRightArm.write(armForward);
+            if (waveLeft) servoLeftArm.write(armBackward);
         } else {
-            if (waveRight) servoRightArm.write(ARM_BACKWARD);
-            if (waveLeft) servoLeftArm.write(ARM_FORWARD);
+            if (waveRight) servoRightArm.write(armBackward);
+            if (waveLeft) servoLeftArm.write(armForward);
             waveCount++;
         }
 
-        if (waveCount >= 3 && currentCommand != CMD_ENERGETIC) {
+        // 設定した回数で停止（元気モードは無限）
+        if (waveCount >= waveMaxCount && currentCommand != CMD_ENERGETIC) {
             isWaving = false;
             servoLeftArm.write(ARM_CENTER);
             servoRightArm.write(ARM_CENTER);

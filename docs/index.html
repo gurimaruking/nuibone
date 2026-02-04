@@ -157,6 +157,73 @@
         .btn-sleep { background: linear-gradient(135deg, #2c3e50 0%, #4ca1af 100%); }
         .btn-stop { background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%); }
 
+        /* スライダー */
+        .slider-container {
+            margin-bottom: 20px;
+        }
+
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .slider-label span {
+            font-size: 14px;
+            color: #333;
+        }
+
+        .slider-value {
+            font-weight: bold;
+            color: #667eea;
+            min-width: 60px;
+            text-align: right;
+        }
+
+        .slider {
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            background: #e0e0e0;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+
+        .slider::-moz-range-thumb {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            cursor: pointer;
+            border: none;
+        }
+
+        .slider:disabled {
+            opacity: 0.5;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .action-buttons .control-btn {
+            flex: 1;
+            padding: 15px;
+        }
+
         .footer {
             text-align: center;
             color: rgba(255,255,255,0.7);
@@ -178,6 +245,43 @@
         .ios-warning.show {
             display: block;
         }
+
+        .ios-warning a {
+            color: #533f03;
+            font-weight: bold;
+        }
+
+        /* タブ切り替え */
+        .tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 15px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            background: #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tab-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -186,7 +290,7 @@
 
         <div class="ios-warning" id="iosWarning">
             ⚠️ iOSのSafariではWeb Bluetoothは使えません。<br>
-            <strong>Bluefy</strong>アプリ（無料）を使ってこのページを開いてください。
+            <a href="https://apps.apple.com/app/bluefy-web-ble-browser/id1492822055" target="_blank">Bluefy</a>アプリ（無料）を使ってこのページを開いてください。
         </div>
 
         <div class="status-card">
@@ -197,8 +301,76 @@
             <button id="connectBtn" onclick="toggleConnection()">接続する</button>
         </div>
 
+        <!-- 呼吸設定 -->
         <div class="control-section">
-            <div class="section-title">🖐️ 手を振る</div>
+            <div class="section-title">💨 呼吸設定</div>
+
+            <div class="slider-container">
+                <div class="slider-label">
+                    <span>🐢 速度（周期）🐇</span>
+                    <span class="slider-value" id="breathSpeedValue">2.5秒</span>
+                </div>
+                <input type="range" class="slider" id="breathSpeedSlider"
+                       min="1000" max="6000" value="2500" step="100"
+                       oninput="updateBreathSpeedLabel()" onchange="sendBreathSpeed()" disabled>
+            </div>
+
+            <div class="slider-container">
+                <div class="slider-label">
+                    <span>📏 振幅（動きの大きさ）</span>
+                    <span class="slider-value" id="breathRangeValue">10°</span>
+                </div>
+                <input type="range" class="slider" id="breathRangeSlider"
+                       min="5" max="40" value="10" step="1"
+                       oninput="updateBreathRangeLabel()" onchange="sendBreathRange()" disabled>
+            </div>
+
+            <div class="action-buttons">
+                <button class="control-btn btn-breath" onclick="sendCommand(4)" disabled>
+                    <span class="icon">😮‍💨</span>
+                    呼吸ON
+                </button>
+                <button class="control-btn btn-stop" onclick="sendCommand(5)" disabled>
+                    <span class="icon">😶</span>
+                    呼吸OFF
+                </button>
+            </div>
+        </div>
+
+        <!-- 腕設定 -->
+        <div class="control-section">
+            <div class="section-title">🖐️ 腕の設定</div>
+
+            <div class="slider-container">
+                <div class="slider-label">
+                    <span>🐢 振る速度 🐇</span>
+                    <span class="slider-value" id="waveSpeedValue">300ms</span>
+                </div>
+                <input type="range" class="slider" id="waveSpeedSlider"
+                       min="100" max="800" value="300" step="50"
+                       oninput="updateWaveSpeedLabel()" onchange="sendWaveSpeed()" disabled>
+            </div>
+
+            <div class="slider-container">
+                <div class="slider-label">
+                    <span>📏 振り幅</span>
+                    <span class="slider-value" id="waveRangeValue">30°</span>
+                </div>
+                <input type="range" class="slider" id="waveRangeSlider"
+                       min="10" max="60" value="30" step="5"
+                       oninput="updateWaveRangeLabel()" onchange="sendWaveRange()" disabled>
+            </div>
+
+            <div class="slider-container">
+                <div class="slider-label">
+                    <span>🔄 回数</span>
+                    <span class="slider-value" id="waveCountValue">3回</span>
+                </div>
+                <input type="range" class="slider" id="waveCountSlider"
+                       min="1" max="10" value="3" step="1"
+                       oninput="updateWaveCountLabel()" onchange="sendWaveCount()" disabled>
+            </div>
+
             <div class="button-grid">
                 <button class="control-btn btn-wave-right" onclick="sendCommand(1)" disabled>
                     <span class="icon">👋</span>
@@ -219,20 +391,7 @@
             </div>
         </div>
 
-        <div class="control-section">
-            <div class="section-title">💨 呼吸</div>
-            <div class="button-grid">
-                <button class="control-btn btn-breath" onclick="sendCommand(4)" disabled>
-                    <span class="icon">😮‍💨</span>
-                    呼吸ON
-                </button>
-                <button class="control-btn btn-stop" onclick="sendCommand(5)" disabled>
-                    <span class="icon">😶</span>
-                    呼吸OFF
-                </button>
-            </div>
-        </div>
-
+        <!-- プリセット -->
         <div class="control-section">
             <div class="section-title">✨ プリセット</div>
             <div class="button-grid">
@@ -247,6 +406,7 @@
             </div>
         </div>
 
+        <!-- 停止 -->
         <div class="control-section">
             <div class="section-title">⏹️ 停止</div>
             <div class="button-grid single">
@@ -258,7 +418,7 @@
         </div>
 
         <div class="footer">
-            NuiBone Controller v1.0<br>
+            NuiBone Controller v1.2<br>
             Web Bluetooth API
         </div>
     </div>
@@ -267,6 +427,13 @@
         // BLE設定
         const SERVICE_UUID = '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
         const COMMAND_CHAR_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26a8';
+
+        // コマンド定義
+        const CMD_SET_BREATH_SPEED = 20;
+        const CMD_SET_BREATH_RANGE = 21;
+        const CMD_SET_WAVE_SPEED = 22;
+        const CMD_SET_WAVE_RANGE = 23;
+        const CMD_SET_WAVE_COUNT = 24;
 
         let device = null;
         let server = null;
@@ -308,30 +475,25 @@
                 updateStatus('検索中...', false);
                 document.getElementById('connectBtn').disabled = true;
 
-                // デバイス選択
                 device = await navigator.bluetooth.requestDevice({
                     filters: [{ name: 'NuiBone' }],
                     optionalServices: [SERVICE_UUID]
                 });
 
                 updateStatus('接続中...', false);
-
-                // 切断イベント
                 device.addEventListener('gattserverdisconnected', onDisconnected);
 
-                // GATT接続
                 server = await device.gatt.connect();
-
-                // サービス取得
                 const service = await server.getPrimaryService(SERVICE_UUID);
-
-                // キャラクタリスティック取得
                 commandChar = await service.getCharacteristic(COMMAND_CHAR_UUID);
 
                 isConnected = true;
                 updateStatus('接続済み: ' + device.name, true);
                 document.getElementById('connectBtn').textContent = '切断する';
                 enableButtons(true);
+
+                // 接続時に現在の設定値を送信
+                await sendAllSettings();
 
             } catch (error) {
                 console.error('接続エラー:', error);
@@ -373,17 +535,118 @@
                 const data = new Uint8Array([cmd]);
                 await commandChar.writeValue(data);
                 console.log('コマンド送信:', cmd);
-
-                // ボタンフィードバック
                 vibrate();
-
             } catch (error) {
                 console.error('送信エラー:', error);
                 alert('コマンド送信に失敗しました');
             }
         }
 
-        // バイブレーション（対応デバイスのみ）
+        // 全設定値を送信
+        async function sendAllSettings() {
+            await sendBreathSpeed();
+            await sendBreathRange();
+            await sendWaveSpeed();
+            await sendWaveRange();
+            await sendWaveCount();
+        }
+
+        // 呼吸速度送信
+        async function sendBreathSpeed() {
+            if (!commandChar) return;
+            try {
+                const speed = parseInt(document.getElementById('breathSpeedSlider').value);
+                const highByte = (speed >> 8) & 0xFF;
+                const lowByte = speed & 0xFF;
+                const data = new Uint8Array([CMD_SET_BREATH_SPEED, highByte, lowByte]);
+                await commandChar.writeValue(data);
+                console.log('呼吸速度:', speed, 'ms');
+            } catch (error) {
+                console.error('送信エラー:', error);
+            }
+        }
+
+        // 呼吸振幅送信
+        async function sendBreathRange() {
+            if (!commandChar) return;
+            try {
+                const range = parseInt(document.getElementById('breathRangeSlider').value);
+                const data = new Uint8Array([CMD_SET_BREATH_RANGE, range]);
+                await commandChar.writeValue(data);
+                console.log('呼吸振幅:', range, '度');
+            } catch (error) {
+                console.error('送信エラー:', error);
+            }
+        }
+
+        // 腕振り速度送信
+        async function sendWaveSpeed() {
+            if (!commandChar) return;
+            try {
+                const speed = parseInt(document.getElementById('waveSpeedSlider').value);
+                const highByte = (speed >> 8) & 0xFF;
+                const lowByte = speed & 0xFF;
+                const data = new Uint8Array([CMD_SET_WAVE_SPEED, highByte, lowByte]);
+                await commandChar.writeValue(data);
+                console.log('腕振り速度:', speed, 'ms');
+            } catch (error) {
+                console.error('送信エラー:', error);
+            }
+        }
+
+        // 腕振り振幅送信
+        async function sendWaveRange() {
+            if (!commandChar) return;
+            try {
+                const range = parseInt(document.getElementById('waveRangeSlider').value);
+                const data = new Uint8Array([CMD_SET_WAVE_RANGE, range]);
+                await commandChar.writeValue(data);
+                console.log('腕振り振幅:', range, '度');
+            } catch (error) {
+                console.error('送信エラー:', error);
+            }
+        }
+
+        // 腕振り回数送信
+        async function sendWaveCount() {
+            if (!commandChar) return;
+            try {
+                const count = parseInt(document.getElementById('waveCountSlider').value);
+                const data = new Uint8Array([CMD_SET_WAVE_COUNT, count]);
+                await commandChar.writeValue(data);
+                console.log('腕振り回数:', count, '回');
+            } catch (error) {
+                console.error('送信エラー:', error);
+            }
+        }
+
+        // ラベル更新関数
+        function updateBreathSpeedLabel() {
+            const speed = parseInt(document.getElementById('breathSpeedSlider').value);
+            document.getElementById('breathSpeedValue').textContent = (speed / 1000).toFixed(1) + '秒';
+        }
+
+        function updateBreathRangeLabel() {
+            const range = parseInt(document.getElementById('breathRangeSlider').value);
+            document.getElementById('breathRangeValue').textContent = range + '°';
+        }
+
+        function updateWaveSpeedLabel() {
+            const speed = parseInt(document.getElementById('waveSpeedSlider').value);
+            document.getElementById('waveSpeedValue').textContent = speed + 'ms';
+        }
+
+        function updateWaveRangeLabel() {
+            const range = parseInt(document.getElementById('waveRangeSlider').value);
+            document.getElementById('waveRangeValue').textContent = range + '°';
+        }
+
+        function updateWaveCountLabel() {
+            const count = parseInt(document.getElementById('waveCountSlider').value);
+            document.getElementById('waveCountValue').textContent = count + '回';
+        }
+
+        // バイブレーション
         function vibrate() {
             if (navigator.vibrate) {
                 navigator.vibrate(50);
@@ -401,17 +664,23 @@
             }
         }
 
-        // ボタン有効/無効
+        // ボタン・スライダー有効/無効
         function enableButtons(enabled) {
             const buttons = document.querySelectorAll('.control-btn');
-            buttons.forEach(btn => {
-                btn.disabled = !enabled;
-            });
+            buttons.forEach(btn => btn.disabled = !enabled);
+
+            const sliders = document.querySelectorAll('.slider');
+            sliders.forEach(slider => slider.disabled = !enabled);
         }
 
         // 初期化
         window.onload = function() {
             checkBluetooth();
+            updateBreathSpeedLabel();
+            updateBreathRangeLabel();
+            updateWaveSpeedLabel();
+            updateWaveRangeLabel();
+            updateWaveCountLabel();
         };
     </script>
 </body>
